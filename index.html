@@ -2,12 +2,12 @@
 <script src="https://d3js.org/d3.v4.js"></script>
 <script src="https://rawgit.com/susielu/d3-annotation/master/d3-annotation.min.js"></script>
 <link rel="stylesheet" type="text/css" href="styles.css">
-<h1>Vaccination vs Covid in California</h1>
+<h1>Vaccination vs Covid in Illinois</h1>
 
 <div id="charts"></div>
 <button type="button" onclick="zoomIn()">Zoom In!</button>
 <p>
-    With the start of vaccination rollout on February 8th, 2021 in California, the rate of new covid cases per day slowed, as can be seen when zooming in 
+    With the start of vaccination rollout on January 12th, 2021 in Illinois, the rate of new covid cases per day slowed, as can be seen when zooming in 
     to view the covid cases trend during vaccine rollout.
 </p>
 <p>
@@ -85,7 +85,7 @@
                         for (var i = 0; i < data.length; i++) {
                             const d = data[i];
                             var formatDate = d3.timeParse("%Y-%m-%d")(d.Date);
-                            if (d.People_Fully_Vaccinated === "" || d.Province_State !== "California") {
+                            if (d.People_Fully_Vaccinated === "" || d.Province_State !== "Illinois") {
                                 continue;
                             } else if (dateToVaccineUS.has(formatDate)) {
                                 dateToVaccineUS.set(formatDate, dateToVaccineUS.get(formatDate) + (+d.People_Fully_Vaccinated));
@@ -113,11 +113,11 @@
                         for (var i = 0; i < data.length; i++) {
                             const d = data[i];    
                             if(zoom){
-                                if(d.date.localeCompare("2021-02-08") < 0){
+                                if(d.date.localeCompare("2021-01-12") < 0){
                                     continue;                                  
                                 }
                                 else{
-                                    if (d.cases === "" || d.state !== "California") {
+                                    if (d.cases === "" || d.state !== "Illinois") {
                                         continue;
                                     }   
                                     else {
@@ -127,7 +127,7 @@
                                 }
                             }                 
                             else{ 
-                                if (d.cases === "" || d.state !== "California") {
+                                if (d.cases === "" || d.state !== "Illinois") {
                                     continue;
                                 }
                                 else {
