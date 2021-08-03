@@ -1,1 +1,300 @@
-Hello World
+<meta charset="utf-8">
+<script src="https://d3js.org/d3.v4.js"></script>
+<script src="https://rawgit.com/susielu/d3-annotation/master/d3-annotation.min.js"></script>
+<link rel="stylesheet" type="text/css" href="styles.css">
+<h1>Vaccination vs Covid in California</h1>
+
+<div id="charts"></div>
+<button type="button" onclick="zoomIn()">Zoom In!</button>
+<p>
+    With the start of vaccination rollout on February 8th, 2021 in California, the rate of new covid cases per day slowed, as can be seen when zooming in 
+    to view the covid cases trend during vaccine rollout.
+</p>
+<p>
+    The spike starting in July suggests the decrease in effectiveness of the vaccines in response to the delta variant.
+</p>
+
+<form action="states.html">
+    <input type="submit" value="Go to Next">(click here to view the effect of the vaccination percentage on covid cases at the country and worldwide level)</button>
+</form>
+<html>
+    <head>
+        <meta charset="utf-8">
+        <link href='https://fonts.googleapis.com/css?family=Lato:300,900' rel='stylesheet' type='text/css'>
+    
+        <style>
+         body{
+            background-color: whitesmoke;
+         }
+    
+         svg {
+            background-color: white;
+            font-family: 'Lato';
+         }
+    
+        .annotation-note-title, text.title {
+          font-weight: bold;
+        }
+    
+        text.title {
+          font-size: 0.6em;
+        }
+    
+        </style>
+    </head>
+    <body>
+        <script>
+            var zoom = false;                        
+            const dateToVaccineUS = new Map();
+            const covidCases = new Map();
+            var covidCasesList = [];
+            var dateToVaccineUSList = [];
+            const annotations = [
+                {
+                    note: {
+                        label: "Click button below to zoom into vaccine rollout timeline",
+                        title: "",
+                        align: "middle",  // try right or left
+                        wrap: 100,  // try something smaller to see text split in several lines
+                        padding: 10,   // More = text lower,
+                        font: 2
+                    },
+                    connector: {end: "dot"},
+                    color: ["red"],
+                    x: 250,
+                    y: 140,
+                    dy: 70,
+                    dx: 70
+                }
+            ]
+            drawPlot();
+            
+            function zoomIn() {
+                zoom = true;
+                dateToVaccineUS.clear();
+                covidCases.clear();
+                covidCasesList = [];
+                dateToVaccineUSList = [];
+                d3.select("#charts").html("");
+                drawPlot();
+            }
+
+            async function drawPlot(){
+                await d3.csv("https://raw.githubusercontent.com/govex/COVID-19/master/data_tables/vaccine_data/us_data/time_series/people_vaccinated_us_timeline.csv",
+                    function(data) {
+                        for (var i = 0; i < data.length; i++) {
+                            const d = data[i];
+                            var formatDate = d3.timeParse("%Y-%m-%d")(d.Date);
+                            if (d.People_Fully_Vaccinated === "" || d.Province_State !== "California") {
+                                continue;
+                            } else if (dateToVaccineUS.has(formatDate)) {
+                                dateToVaccineUS.set(formatDate, dateToVaccineUS.get(formatDate) + (+d.People_Fully_Vaccinated));
+                            } else {
+                                dateToVaccineUS.set(formatDate, +d.People_Fully_Vaccinated);
+                            }
+                        }
+                        console.log(dateToVaccineUS);
+                        new Map([...dateToVaccineUS].sort(
+                        function(a, b) {
+                            return a - b;
+                        }
+                        )).forEach(function(value, key){
+                            var obj = new Object();
+                            obj.key = key;
+                            obj.value = value;
+                            dateToVaccineUSList.push(obj);
+                        });
+
+
+                    });
+                
+                await d3.csv("https://raw.githubusercontent.com/nytimes/covid-19-data/master/us-states.csv",
+                    function(data) {
+                        for (var i = 0; i < data.length; i++) {
+                            const d = data[i];    
+                            if(zoom){
+                                if(d.date.localeCompare("2021-02-08") < 0){
+                                    continue;                                  
+                                }
+                                else{
+                                    if (d.cases === "" || d.state !== "California") {
+                                        continue;
+                                    }   
+                                    else {
+                                        var formatDate = d3.timeParse("%Y-%m-%d")(d.date);
+                                        covidCases.set(formatDate, +d.cases);
+                                      }                                                                         
+                                }
+                            }                 
+                            else{ 
+                                if (d.cases === "" || d.state !== "California") {
+                                    continue;
+                                }
+                                else {
+                                    var formatDate = d3.timeParse("%Y-%m-%d")(d.date);
+                                    covidCases.set(formatDate, +d.cases);
+                                }
+                            }
+
+                        }
+                        console.log(covidCases);
+
+                        new Map([...covidCases].sort(
+                        function(a, b) {
+                            return a - b;
+                        }
+                        )).forEach(function(value, key){
+                            var obj = new Object();
+                            obj.key = key;
+                            obj.value = value;
+                            covidCasesList.push(obj);
+                        });
+
+                //////////create svg//////////////////
+                var margin = {top: 20, right: 20, bottom: 40, left: 100},
+                    width = 500 - margin.left - margin.right,
+                    height = 400 - margin.top - margin.bottom;
+                
+                var svgVaccine = d3.select("#charts")
+                    .append("svg")
+                        .attr("width", width + margin.left + margin.right)
+                        .attr("height", height + margin.top + margin.bottom)
+                    .append("g")
+                        .attr("transform",
+                            "translate(" + margin.left + "," + margin.top + ")");  
+
+                var svgCovid = d3.select("#charts")
+                    .append("svg")
+                        .attr("width", width + margin.left + margin.right)
+                        .attr("height", height + margin.top + margin.bottom)
+                    .append("g")
+                        .attr("transform",
+                            "translate(" + margin.left + "," + margin.top + ")");  
+                //////////////////////////////////
+
+                ////////vaccine chart//////////////
+                var x = d3.scaleTime()
+                        .domain(d3.extent(Array.from( dateToVaccineUS.keys())))
+                        .range([0, width]);
+
+                svgVaccine.append("g")
+                    .attr("transform", "translate(0," + height + ")")
+                    .call(d3.axisBottom(x));
+
+                
+                var y = d3.scaleLinear()
+                    .domain(d3.extent(Array.from( dateToVaccineUS.values())))
+                    .range([ height, 0 ]);
+
+                svgVaccine.append("g")
+                    .call(d3.axisLeft(y));
+
+                svgVaccine.append("path")
+                    .datum(dateToVaccineUSList)
+                    .attr("fill", "none")
+                    .attr("stroke", "#69b3a2")
+                    .attr("stroke-width", 1.5)
+                    .attr("d", d3.line()
+                    .x(function(d) { 
+                        return x(d.key) 
+                    })
+                    .y(function(d) { return y(d.value) })
+                );
+                svgVaccine.append("g")
+                    .selectAll("dot")
+                    .data(dateToVaccineUSList)
+                    .enter()
+                    .append("circle")
+                    .attr("cx", function(d) { return x(d.key) } )
+                    .attr("cy", function(d) { return y(d.value) } )
+                    .attr("r", 2)
+                    .attr("fill", "#69b3a2");
+                    
+                // Add X axis label:
+                svgVaccine.append("text")
+                    .attr("text-anchor", "end")
+                    .attr("x", width)
+                    .attr("y", height + margin.top + 15)
+                    .text("Vaccination Date   ");
+
+                // Y axis label:
+                svgVaccine.append("text")
+                    .attr("text-anchor", "end")
+                    .attr("transform", "rotate(-90)")
+                    .attr("y", -margin.left+20)
+                    .attr("x", -margin.top)
+                    .text("Number of Vaccines Distributed")
+
+
+                ////////////////////////////////////
+
+                ///covid chart////////////////
+                var x = d3.scaleTime()
+                    .domain(d3.extent(Array.from( covidCases.keys())))
+                    .range([0, width]);
+
+                svgCovid.append("g")
+                    .attr("transform", "translate(0," + height + ")")
+                    .call(d3.axisBottom(x));
+
+                var y = d3.scaleLinear()
+                    .domain(d3.extent(Array.from( covidCases.values())))
+                    .range([ height, 0 ]);
+
+                svgCovid.append("g")
+                    .call(d3.axisLeft(y));    
+
+                svgCovid.append("path")
+                    .datum(covidCasesList)
+                    .attr("fill", "none")
+                    .attr("stroke", "#69b3a3")
+                    .attr("stroke-width", 1.5)
+                    .attr("d", d3.line()
+                    .x(function(d) { 
+                        return x(d.key) 
+                    })
+                    .y(function(d) { return y(d.value) })
+                );
+
+                svgCovid.append("g")
+                    .selectAll("dot")
+                    .data(covidCasesList)
+                    .enter()
+                    .append("circle")
+                    .attr("cx", function(d) { return x(d.key) } )
+                    .attr("cy", function(d) { return y(d.value) } )
+                    .attr("r", 2)
+                    .attr("fill", "#69b3a3")
+                
+
+                // Add X axis label:
+                svgCovid.append("text")
+                    .attr("text-anchor", "end")
+                    .attr("x", width)
+                    .attr("y", height + margin.top + 15)
+                    .text("Covid Case Date");
+
+                // Y axis label:
+                svgCovid.append("text")
+                    .attr("text-anchor", "end")
+                    .attr("transform", "rotate(-90)")
+                    .attr("y", -margin.left+20)
+                    .attr("x", -margin.top)
+                    .text("Number of Covid Cases");
+                
+                if(!zoom){
+                    // Add annotation to the chart
+                    const makeAnnotations = d3.annotation()
+                    .annotations(annotations)
+                    
+                    svgCovid.append("g")
+                    .call(makeAnnotations)
+                }                   
+
+                });
+            }
+
+        </script>
+    </body>
+</html>
+

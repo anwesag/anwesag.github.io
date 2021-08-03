@@ -1,0 +1,225 @@
+<meta charset="utf-8">
+<script src="https://d3js.org/d3.v7.js"></script>
+<style>
+body{
+background-color: whitesmoke;
+}
+
+svg {
+background-color: white;
+font-family: 'Lato';
+}
+.bubbles {
+  stroke-width: 4px;
+  stroke: gray;
+}
+.bubbles:hover {
+  stroke: violet;
+}
+</style>
+<h1>Percentange of Population Vaccination vs Covid Cases: Worldwide</h1>
+<form action="states.html">
+    <button type="submit" value="Go to Next">Switch to US View</button>
+</form>
+<input type="date" id="date" value="2021-07-19">
+<button type="button" onclick="drawScatterPlot('2021-02-15')">Submit date</button>
+<div id="scatter_states"></div>
+<form action="index.html">
+    <button type="submit" value="Go to Next">Back to Main</button>
+</form>
+<p>
+    Larger circles indicate higher vaccination rates. At both the worldwide level and the country level, states with higher vaccination records show lower covid rates before the rise of the delta variant.
+</p>
+<html>
+    <body>
+        <script>
+            drawScatterPlot();
+
+            async function getJoinedObject(date) {
+                var filteredCovidCasesByCountry;
+                await d3.csv("https://raw.githubusercontent.com/owid/covid-19-data/master/public/data/testing/covid-testing-all-observations.csv")
+                    .then(function(data) {
+                        filteredCovidCasesByCountry = data.filter(function(row) {
+                            return row.Date === date;
+                        });
+
+                        // console.log(filteredCovidCasesByState);
+                    }
+                );
+
+                var filteredCovidVaccinationsByCountry;
+                await d3.csv("https://raw.githubusercontent.com/govex/COVID-19/master/data_tables/vaccine_data/global_data/time_series_covid19_vaccine_global.csv")
+                    .then(function(data) {
+                        filteredCovidVaccinationsByCountry = data.filter(function(row) {
+                            return row.Date === date;
+                        });
+                        // console.log(filteredCovidVaccinationsByState);
+                    });
+
+                var countryPopulation;
+                await d3.csv("https://gist.githubusercontent.com/curran/0ac4077c7fc6390f5dd33bf5c06cb5ff/raw/605c54080c7a93a417a3cea93fd52e7550e76500/UN_Population_2019.csv")
+                    .then(function(data) {
+                        countryPopulation = data;
+                    });
+
+                var joinedMapByState = []
+                filteredCovidCasesByCountry.forEach(
+                    function(covidRow) {
+                        const countryName = covidRow.Entity.split('-')[0].trim();
+
+                        const stateRows = filteredCovidVaccinationsByCountry.filter(
+                            (vaccineRow) => {
+                                return countryName === vaccineRow.Country_Region;
+                            }
+                        )
+                        const populationRows = countryPopulation.filter(
+                            (populationRow) => countryName === populationRow.Country
+                        );
+
+                        if (stateRows.length == 0 || populationRows == 0) return;
+                        console.log(countryName);
+
+                        var combinedObject = new Object();
+                        const population = +populationRows[0]["2018"] * 1000;
+                        combinedObject.country = countryName;
+                        combinedObject.covidCases = +covidRow["Cumulative total"] / population;
+                        combinedObject.vaccinations = +stateRows[0].People_fully_vaccinated / population;
+                        combinedObject.population = population;
+
+                        console.log(combinedObject);
+                        console.log("covid row: ", stateRows);
+
+                        joinedMapByState.push(combinedObject);
+                    }
+                );
+                return joinedMapByState
+            }
+
+            async function drawScatterPlot() {
+                date = document.getElementById("date").value;
+                d3.selectAll("#scatter_states > *").remove(); 
+
+                var margin = {top: 10, right: 30, bottom: 30, left: 60},
+                    width = 460 - margin.left - margin.right,
+                    height = 400 - margin.top - margin.bottom;
+                
+                
+                var svg = d3.select("#scatter_states")
+                    .append("svg")
+                        .attr("width", width + margin.left + margin.right)
+                        .attr("height", height + margin.top + margin.bottom)
+                    .append("g")
+                        .attr("transform",
+                            "translate(" + margin.left + "," + margin.top + ")");    
+
+                const joinedMapByState = await getJoinedObject(date);
+                // Add X axis
+                var x = d3.scaleLinear()
+                    .domain([0, d3.max(joinedMapByState, (row) => +row.vaccinations)])
+                    .range([ 0, width ]);
+                svg.append("g")
+                    .attr("transform", "translate(0," + height + ")")
+                    .attr("class", "x axis")
+                    .call(d3.axisBottom(x));
+
+                // Add Y axis
+                var y = d3.scaleLinear()
+                    .domain([0, d3.max(joinedMapByState, (row) => +row.covidCases)])
+                    .range([ height, 0]);
+                svg.append("g")
+                    .attr("class", "y axis")
+                    .call(d3.axisLeft(y));
+
+                  // Add dots
+                svg.append('g')
+                    .selectAll("dot")
+                    .data(joinedMapByState)
+                    .enter()
+                    .append("circle")
+                    .attr("class", "bubbles")
+                    .attr("cx", function (d) { return x(d.vaccinations); } )
+                    .attr("cy", function (d) { return y(d.covidCases); } )
+                    .attr("r", function (d) { return d.population / 9000000; })
+                    .style("fill", "#69b3a2")
+                    .on("mouseover", showTooltip )
+                    .on("mousemove", moveTooltip )
+                    .on("mouseleave", hideTooltip )
+
+            }
+
+            async function updateScatterData(date) {
+
+                var margin = {top: 10, right: 30, bottom: 30, left: 60},
+                    width = 460 - margin.left - margin.right,
+                    height = 400 - margin.top - margin.bottom;
+                
+                // Select the section we want to apply our changes to
+                var svg = d3.select("#scatter_states")
+
+                const joinedMapByState = await getJoinedObject(date);
+                // Add X axis
+                var x = d3.scaleLinear()
+                    .domain([0, d3.max(joinedMapByState, (row) => +row.vaccinations)])
+                    .range([ 0, width ]);
+
+                // Add Y axis
+                var y = d3.scaleLinear()
+                    .domain([0, d3.max(joinedMapByState, (row) => +row.covidCases)])
+                    .range([ height, 0]);
+
+                svg.select(".bubbles")
+                    .data(joinedMapByState)
+                    .enter()
+                    .append("circle")
+                    .attr("class", "bubbles")
+                    .attr("cx", function (d) { return x(d.vaccinations); } )
+                    .attr("cy", function (d) { return y(d.covidCases); } )
+                    .attr("r", function (d) { return d.population / 900000; })
+                    .style("fill", "#69b3a2")
+                    .on("mouseover", showTooltip )
+                    .on("mousemove", moveTooltip )
+                    .on("mouseleave", hideTooltip )
+                // Make the changes
+                    svg.select(".x.axis") // change the x axis
+                        .call(d3.axisBottom(x));
+                    svg.select(".y.axis") // change the y axis
+                        .call(d3.axisLeft(y));
+            };
+
+            // Tooltips
+            var tooltip = d3.select("#scatter_states")
+                .append("div")
+                .style("opacity", 0)
+                .attr("class", "tooltip")
+                .style("background-color", "black")
+                .style("border-radius", "5px")
+                .style("padding", "10px")
+                .style("color", "white")
+
+            var showTooltip = function(event, d) {
+                tooltip
+                .transition()
+                .duration(200)
+                tooltip
+                .style("opacity", 1)
+                .html("Country: " + d.country + ", Cases: " + Math.round(d.covidCases * 100) + "%, Vaccinated: " + Math.round(d.vaccinations * 100) + "%")
+                .style("left", (event.pageX)+30 + "px")
+                .style("top", (event.pageY)+30 + "px")
+            }
+            var moveTooltip = function(event, d) {
+                tooltip
+                .style("left", (event.pageX)+30 + "px")
+                .style("top", (event.pageY)+30 + "px")
+            }
+            var hideTooltip = function(event, d) {
+                tooltip
+                .transition()
+                .duration(200)
+                .style("opacity", 0)
+            }
+
+
+        </script>
+    </body>
+</html>
+
